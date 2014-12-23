@@ -32,7 +32,7 @@
 		<dependency>
 			<groupId>co.paralleluniverse</groupId>
 			<artifactId>quasar-core</artifactId>
-			<version>0.6.2-SNAPSHOT</version>
+			<version>0.6.2</version>
 		</dependency>
 
 		<dependency>
