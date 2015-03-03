@@ -4,13 +4,16 @@
 
 	<groupId>org.codehaus.groovy</groupId>
 	<artifactId>groovy</artifactId>
-	<version>2.3.7</version>
+	<version>2.4.1.1</version>
 	<packaging>jar</packaging>
 
 	<name>groovy</name>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<quasar.version>0.6.2</quasar.version>
+		<groovy.version>2.4.1</groovy.version>
+		<groovy.classifier>indy</groovy.classifier>
 	</properties>
 
 	<dependencies>
@@ -32,7 +35,7 @@
 		<dependency>
 			<groupId>co.paralleluniverse</groupId>
 			<artifactId>quasar-core</artifactId>
-			<version>0.6.2</version>
+			<version>${quasar.version}</version>
 		</dependency>
 
 		<dependency>
@@ -44,7 +47,8 @@
 		<dependency>
 			<groupId>org.codehaus.groovy</groupId>
 			<artifactId>groovy</artifactId>
-			<version>2.3.7</version>
+			<version>${groovy.version}</version>
+			<classifier>${groovy.classifier}</classifier>
 		</dependency>
 	</dependencies>
 
@@ -65,7 +69,8 @@
 								<artifactItem>
 									<groupId>org.codehaus.groovy</groupId>
 									<artifactId>groovy</artifactId>
-									<version>2.3.7</version>
+									<version>${groovy.version}</version>
+									<classifier>${groovy.classifier}</classifier>
 									<type>jar</type>
 									<overWrite>true</overWrite>
 									<outputDirectory>${project.build.directory}/classes</outputDirectory>
