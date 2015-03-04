@@ -19,7 +19,7 @@ Then, in an application that uses the Groovy replace original dependency:
 <dependency>
 	<groupId>org.codehaus.groovy</groupId>
 	<artifactId>groovy</artifactId>
-	<version>2.3.7</version>
+	<version>2.4.1</version>
 </dependency>
 ```
 on
@@ -28,14 +28,14 @@ on
 <dependency>
 	<groupId>org.codehaus.groovy</groupId>
 	<artifactId>groovy</artifactId>
-	<version>2.3.7</version>
+	<version>2.4.4.x</version>
 	<classifier>quasar-support</classifier>
 </dependency>
 ```
 
 ## Architecture
 
-This package contains the original version of Groovy 2.3.7, which has been treated with Quasar InstrumentedTask.   
+This package contains the original version of Groovy 2.4.1, which has been treated with Quasar InstrumentedTask.   
 
 ## References
 
