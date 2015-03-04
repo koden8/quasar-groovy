@@ -28,7 +28,7 @@ on
 <dependency>
 	<groupId>org.codehaus.groovy</groupId>
 	<artifactId>groovy</artifactId>
-	<version>2.4.4.x</version>
+	<version>2.4.1.x</version>
 	<classifier>quasar-support</classifier>
 </dependency>
 ```
