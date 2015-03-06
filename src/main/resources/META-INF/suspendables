@@ -2332,3 +2332,4 @@ org.codehaus.groovy.runtime.dgm$990.doMethodInvoke(Ljava/lang/Object;[Ljava/lang
 org.codehaus.groovy.runtime.dgm$990.invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
 org.codehaus.groovy.runtime.dgm$991.doMethodInvoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
 org.codehaus.groovy.runtime.dgm$991.invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
+org.codehaus.groovy.vmplugin.v7.IndyInterface.selectMethod(Ljava/lang/invoke/MutableCallSite;Ljava/lang/Class;Ljava/lang/String;ILjava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Boolean;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;

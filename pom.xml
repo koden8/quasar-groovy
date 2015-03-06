@@ -14,6 +14,7 @@
 		<quasar.version>0.6.2</quasar.version>
 		<groovy.version>2.4.1</groovy.version>
 		<groovy.classifier>indy</groovy.classifier>
+		<co.paralleluniverse.fibers.verifyInstrumentation>false</co.paralleluniverse.fibers.verifyInstrumentation>
 	</properties>
 
 	<dependencies>
@@ -54,6 +55,26 @@
 
 	<build>
 		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<source>1.7</source>
+					<target>1.7</target>
+					<encoding>UTF-8</encoding>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<systemPropertyVariables>
+						<co.paralleluniverse.fibers.verifyInstrumentation>${co.paralleluniverse.fibers.verifyInstrumentation}
+						</co.paralleluniverse.fibers.verifyInstrumentation>
+					</systemPropertyVariables>
+				</configuration>
+			</plugin>
+
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-dependency-plugin</artifactId>
@@ -129,7 +150,9 @@
 								<InstrumentationTask allowMonitors="true">
 									<!--<fileset dir="${project.build.directory}/classes/" includes="**/*.class" excludes="groovy/ui/GroovyMain.class"/>-->
 									<fileset dir="${project.build.directory}/classes/"
-									         includes="org/codehaus/groovy/runtime/*.class,org/codehaus/groovy/runtime/callsite/*.class"
+									         includes="org/codehaus/groovy/runtime/*.class,
+									         org/codehaus/groovy/runtime/callsite/*.class,
+									         org/codehaus/groovy/vmplugin/**/*.class"
 									         excludes="groovy/ui/GroovyMain.class,org/codehaus/groovy/runtime/ClassExtender.class,
 									         org/codehaus/groovy/runtime/metaclass/ClosureMetaClass.class,
 									         org/codehaus/groovy/runtime/metaclass/ConcurrentReaderHashMap.class,

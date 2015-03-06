@@ -5,6 +5,7 @@ import co.paralleluniverse.fibers.FiberForkJoinScheduler;
 import co.paralleluniverse.fibers.FiberScheduler;
 import co.paralleluniverse.fibers.SuspendExecution;
 import co.paralleluniverse.fibers.futures.AsyncListenableFuture;
+import co.paralleluniverse.fibers.instrument.SuspendableHelper;
 import co.paralleluniverse.strands.SuspendableRunnable;
 import com.google.common.util.concurrent.SettableFuture;
 import groovy.lang.Binding;
@@ -127,5 +128,20 @@ public class FiberTest {
 		final Script script = createScript(code, args);
 		AtomicInteger counter = (AtomicInteger) script.run();
 		Assert.assertEquals(counter.intValue(), 2);
+	}
+
+	@Test
+	public void selectMethodInstrumented() throws Exception {
+		Assert.assertTrue(SuspendableHelper.isInstrumented(org.codehaus.groovy.vmplugin.v7.IndyInterface.class, "selectMethod"));
+
+		final Script script = createScript("sleep(1000);", new HashMap<String, Object>());
+		Fiber fiber = new Fiber(scheduler, new SuspendableRunnable() {
+			@Override
+			public void run() throws SuspendExecution, InterruptedException {
+				script.run();
+			}
+		});
+		fiber.start();
+		fiber.join();
 	}
 }
