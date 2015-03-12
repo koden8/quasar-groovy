@@ -23,15 +23,19 @@
  */
 package groovy.lang;
 
-import co.paralleluniverse.fibers.instrument.DefaultSuspendableClassifier;
-import co.paralleluniverse.fibers.instrument.QuasarInstrumentor;
-import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.ModuleNode;
+import org.codehaus.groovy.ast.*;
+import org.codehaus.groovy.ast.expr.ConstantExpression;
+import org.codehaus.groovy.classgen.GeneratorContext;
 import org.codehaus.groovy.classgen.Verifier;
 import org.codehaus.groovy.control.*;
+import org.codehaus.groovy.quasar.QuasarBytecodeProcessor;
 import org.codehaus.groovy.runtime.IOGroovyMethods;
+import org.objectweb.asm.Opcodes;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.*;
 import java.security.*;
 import java.util.*;
@@ -54,6 +58,8 @@ import java.util.regex.Pattern;
  * @version $Revision$
  */
 public class GroovyClassLoader extends URLClassLoader {
+
+	private static final URL[] EMPTY_URL_ARRAY = new URL[0];
 
 	/**
 	 * this cache contains the loaded classes or PARSING, if the class is currently parsed
@@ -119,7 +125,7 @@ public class GroovyClassLoader extends URLClassLoader {
 	 * @param useConfigurationClasspath determines if the configurations classpath should be added
 	 */
 	public GroovyClassLoader(ClassLoader parent, CompilerConfiguration config, boolean useConfigurationClasspath) {
-		super(new URL[0], parent);
+		super(EMPTY_URL_ARRAY, parent);
 		if (config == null) config = CompilerConfiguration.DEFAULT;
 		this.config = config;
 		if (useConfigurationClasspath) {
@@ -266,6 +272,9 @@ public class GroovyClassLoader extends URLClassLoader {
 		validate(codeSource);
 		Class answer;  // Was neither already loaded nor compiling, so compile and add to cache.
 		CompilationUnit unit = createCompilationUnit(config, codeSource.getCodeSource());
+		if (recompile != null && recompile || recompile == null && config.getRecompileGroovySource()) {
+			unit.addFirstPhaseOperation(TimestampAdder.INSTANCE, CompilePhase.CLASS_GENERATION.getPhaseNumber());
+		}
 		SourceUnit su = null;
 		File file = codeSource.getFile();
 		if (file != null) {
@@ -335,22 +344,27 @@ public class GroovyClassLoader extends URLClassLoader {
 	protected PermissionCollection getPermissions(CodeSource codeSource) {
 		PermissionCollection perms;
 		try {
-			perms = super.getPermissions(codeSource);
-		} catch (SecurityException e) {
+			try {
+				perms = super.getPermissions(codeSource);
+			} catch (SecurityException e) {
+				// We lied about our CodeSource and that makes URLClassLoader unhappy.
+				perms = new Permissions();
+			}
+
+			ProtectionDomain myDomain = AccessController.doPrivileged(new PrivilegedAction<ProtectionDomain>() {
+				public ProtectionDomain run() {
+					return getClass().getProtectionDomain();
+				}
+			});
+			PermissionCollection myPerms = myDomain.getPermissions();
+			if (myPerms != null) {
+				for (Enumeration<Permission> elements = myPerms.elements(); elements.hasMoreElements(); ) {
+					perms.add(elements.nextElement());
+				}
+			}
+		} catch (Throwable e) {
 			// We lied about our CodeSource and that makes URLClassLoader unhappy.
 			perms = new Permissions();
-		}
-
-		ProtectionDomain myDomain = AccessController.doPrivileged(new PrivilegedAction<ProtectionDomain>() {
-			public ProtectionDomain run() {
-				return getClass().getProtectionDomain();
-			}
-		});
-		PermissionCollection myPerms = myDomain.getPermissions();
-		if (myPerms != null) {
-			for (Enumeration<Permission> elements = myPerms.elements(); elements.hasMoreElements();) {
-				perms.add(elements.nextElement());
-			}
 		}
 		perms.setReadOnly();
 		return perms;
@@ -461,12 +475,14 @@ public class GroovyClassLoader extends URLClassLoader {
 		private final SourceUnit su;
 		private final CompilationUnit unit;
 		private final Collection<Class> loadedClasses;
+		private final QuasarBytecodeProcessor quasarBytecodeProcessor;
 
 		protected ClassCollector(InnerLoader cl, CompilationUnit unit, SourceUnit su) {
 			this.cl = cl;
 			this.unit = unit;
 			this.loadedClasses = new ArrayList<Class>();
 			this.su = su;
+			this.quasarBytecodeProcessor = new QuasarBytecodeProcessor(cl);
 		}
 
 		public GroovyClassLoader getDefiningClassLoader() {
@@ -474,8 +490,14 @@ public class GroovyClassLoader extends URLClassLoader {
 		}
 
 		protected Class createClass(byte[] code, ClassNode classNode) {
+			BytecodeProcessor bytecodePostprocessor = unit.getConfiguration().getBytecodePostprocessor();
+			byte[] fcode = code;
+			if (bytecodePostprocessor != null) {
+				fcode = bytecodePostprocessor.processBytecode(classNode.getName(), fcode);
+			}
+			fcode = quasarBytecodeProcessor.processBytecode(classNode.getName(), fcode);
 			GroovyClassLoader cl = getDefiningClassLoader();
-			Class theClass = cl.defineClass(classNode.getName(), code, 0, code.length, unit.getAST().getCodeSource());
+			Class theClass = cl.defineClass(classNode.getName(), fcode, 0, fcode.length, unit.getAST().getCodeSource());
 			this.loadedClasses.add(theClass);
 
 			if (generatedClass == null) {
@@ -492,18 +514,16 @@ public class GroovyClassLoader extends URLClassLoader {
 
 		protected Class onClassNode(groovyjarjarasm.asm.ClassWriter classWriter, ClassNode classNode) {
 			byte[] code = classWriter.toByteArray();
-			final QuasarInstrumentor instrumentor = new QuasarInstrumentor(true, cl, new DefaultSuspendableClassifier(cl));
-			byte[] newCode = instrumentor.instrumentClass(classNode.getName(), code);
-			return createClass(newCode, classNode);
-		}
-
-		public Collection getLoadedClasses() {
-			return this.loadedClasses;
+			return createClass(code, classNode);
 		}
 
 		@Override
 		public void call(groovyjarjarasm.asm.ClassVisitor classWriter, ClassNode classNode) throws CompilationFailedException {
 			onClassNode((groovyjarjarasm.asm.ClassWriter) classWriter, classNode);
+		}
+
+		public Collection getLoadedClasses() {
+			return this.loadedClasses;
 		}
 	}
 
@@ -818,7 +838,7 @@ public class GroovyClassLoader extends URLClassLoader {
 	private File fileReallyExists(URL ret, String fileWithoutPackage) {
 		File path;
 		try {
-            /* fix for GROOVY-5809 */
+	        /* fix for GROOVY-5809 */
 			path = new File(ret.toURI());
 		} catch(URISyntaxException e) {
 			path = new File(decodeFileName(ret.getFile()));
@@ -953,6 +973,50 @@ public class GroovyClassLoader extends URLClassLoader {
 		}
 		synchronized (sourceCache) {
 			sourceCache.clear();
+		}
+	}
+
+	private static class TimestampAdder extends CompilationUnit.PrimaryClassNodeOperation implements Opcodes {
+		private final static TimestampAdder INSTANCE = new TimestampAdder();
+
+		private TimestampAdder() {
+		}
+
+		protected void addTimeStamp(ClassNode node) {
+			if (node.getDeclaredField(Verifier.__TIMESTAMP) == null) { // in case if verifier visited the call already
+				FieldNode timeTagField = new FieldNode(
+						Verifier.__TIMESTAMP,
+						ACC_PUBLIC | ACC_STATIC | ACC_SYNTHETIC,
+						ClassHelper.long_TYPE,
+						//"",
+						node,
+						new ConstantExpression(System.currentTimeMillis()));
+				// alternatively, FieldNode timeTagField = SourceUnit.createFieldNode("public static final long __timeStamp = " + System.currentTimeMillis() + "L");
+				timeTagField.setSynthetic(true);
+				node.addField(timeTagField);
+
+				timeTagField = new FieldNode(
+						Verifier.__TIMESTAMP__ + String.valueOf(System.currentTimeMillis()),
+						ACC_PUBLIC | ACC_STATIC | ACC_SYNTHETIC,
+						ClassHelper.long_TYPE,
+						//"",
+						node,
+						new ConstantExpression((long) 0));
+				// alternatively, FieldNode timeTagField = SourceUnit.createFieldNode("public static final long __timeStamp = " + System.currentTimeMillis() + "L");
+				timeTagField.setSynthetic(true);
+				node.addField(timeTagField);
+			}
+		}
+
+		@Override
+		public void call(final SourceUnit source, final GeneratorContext context, final ClassNode classNode) throws CompilationFailedException {
+			if ((classNode.getModifiers() & Opcodes.ACC_INTERFACE) > 0) {
+				// does not apply on interfaces
+				return;
+			}
+			if (!(classNode instanceof InnerClassNode)) {
+				addTimeStamp(classNode);
+			}
 		}
 	}
 }
